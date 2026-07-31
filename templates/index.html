@@ -18,17 +18,17 @@
   </header>
   <main class="shell">
     <section class="hero">
-      <div><span class="eyebrow">SECURE VIDEO INGESTION</span><h1>Turn video into a clear,<br><span>timestamped story.</span></h1><p>Securely validate an authorized local video or direct public video URL before face-presence detection in Phase 3.</p></div>
+      <div><span class="eyebrow">HUMAN-FACE PRESENCE DETECTION</span><h1>Turn video into a clear,<br><span>timestamped story.</span></h1><p>Securely validate an authorized video and detect whether at least one human face appears. Identity always remains Unknown.</p></div>
       <div class="privacy-note"><span class="shield">◇</span><div><strong>Privacy first</strong><p>Identity always remains Unknown. Face detection does not prove identity, liveness, or authenticity.</p></div></div>
     </section>
     <section class="workspace-grid">
       <article class="panel source-panel">
-        <div class="panel-heading"><div><span class="step">01</span><h2>Add your video</h2></div><span class="phase-tag">Phase 2</span></div>
+        <div class="panel-heading"><div><span class="step">01</span><h2>Add your video</h2></div><span class="phase-tag">Phase 3</span></div>
         <div id="errorBanner" class="error-banner" role="alert" hidden></div>
         <div class="source-tabs" role="tablist"><button class="tab active" type="button" data-tab="upload">Upload video</button><button class="tab" type="button" data-tab="url">Public URL</button></div>
         <div id="uploadPane" class="tab-pane active"><label class="dropzone" for="videoFile"><input id="videoFile" type="file" accept=".mp4,.mov,.mkv,.webm,.avi,.m4v,video/*"><span class="upload-icon">↑</span><strong>Drop a video here</strong><span>or click to browse · MP4, MOV, MKV, WEBM, AVI, M4V</span><small>Maximum size and duration are validated securely</small></label></div>
         <div id="urlPane" class="tab-pane"><label class="field-label" for="videoUrl">Direct public video URL</label><div class="url-field"><span>↗</span><input id="videoUrl" type="url" placeholder="https://example.com/video.mp4"></div><p class="field-help">Private, login-required, and DRM-protected sources are not supported.</p></div>
-        <button id="processButton" class="process-button" type="button" disabled><span>✦</span> Validate video</button>
+        <button id="processButton" class="process-button" type="button" disabled><span>✦</span> Detect human faces</button>
       </article>
       <article class="panel preview-panel">
         <div class="panel-heading"><div><span class="step">02</span><h2>Video preview</h2></div><span class="duration">00:00</span></div>
@@ -38,12 +38,17 @@
       </article>
     </section>
     <section class="result-grid">
-      <article class="metric-card"><span class="metric-icon cyan">◎</span><div><small>INGESTION STATUS</small><strong id="ingestionStatus">Not processed</strong></div></article>
-      <article class="metric-card"><span class="metric-icon violet">◉</span><div><small>MAXIMUM FACES</small><strong>—</strong></div></article>
+      <article class="metric-card"><span class="metric-icon cyan">◎</span><div><small>HUMAN FACE</small><strong id="faceResult">Not processed</strong></div></article>
+      <article class="metric-card"><span class="metric-icon violet">◉</span><div><small>MAXIMUM FACES</small><strong id="maximumFaces">—</strong></div></article>
       <article class="metric-card"><span class="metric-icon amber">◇</span><div><small>IDENTITY</small><strong>Unknown</strong></div></article>
-      <article class="metric-card"><span class="metric-icon green">文</span><div><small>LANGUAGE</small><strong>—</strong></div></article>
+      <article class="metric-card"><span class="metric-icon green">◷</span><div><small>DURATION</small><strong id="resultDuration">—</strong></div></article>
+      <article class="metric-card"><span class="metric-icon cyan">#</span><div><small>SAMPLED FRAMES</small><strong id="sampledFrames">—</strong></div></article>
+      <article class="metric-card"><span class="metric-icon violet">%</span><div><small>AVERAGE DETECTION CONFIDENCE</small><strong id="averageConfidence">—</strong></div></article>
+      <article class="metric-card"><span class="metric-icon green">↑</span><div><small>BEST DETECTION CONFIDENCE</small><strong id="bestConfidence">—</strong></div></article>
+      <article class="metric-card"><span class="metric-icon amber">⚙</span><div><small>INFERENCE DEVICE</small><strong id="inferenceDevice">—</strong></div></article>
     </section>
-    <section class="panel transcript-panel"><div class="panel-heading transcript-heading"><div><span class="step">03</span><h2>Timestamped transcript</h2></div><div class="transcript-actions"><input aria-label="Search transcript" type="search" placeholder="Search transcript…" disabled><button type="button" disabled>Copy</button><button type="button" disabled>TXT</button><button type="button" disabled>JSON</button><button type="button" disabled>SRT</button></div></div><div class="transcript-empty"><span>☷</span><strong>No transcript yet</strong><p>Speech transcription becomes available in a future phase.</p></div></section>
+    <p class="detection-disclaimer">Face detection only confirms that the detector found a face-like region. It does not prove identity, liveness, or authenticity.</p>
+    <section class="panel transcript-panel"><div class="panel-heading transcript-heading"><div><span class="step">03</span><h2>Timestamped transcript</h2></div><div class="transcript-actions"><input aria-label="Search transcript" type="search" placeholder="Search transcript…" disabled><button type="button" disabled>Copy</button><button type="button" disabled>TXT</button><button type="button" disabled>JSON</button><button type="button" disabled>SRT</button></div></div><div class="transcript-empty"><span>☷</span><strong>No transcript yet</strong><p>Transcription will be available in Phase 4.</p></div></section>
   </main>
   <footer>Process only content you own or are authorized to use.</footer>
   <script src="{{ url_for('static', path='/js/app.js') }}" defer></script>

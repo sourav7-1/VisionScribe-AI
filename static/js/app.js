@@ -59,13 +59,25 @@ async function pollJob(pollUrl) {
     if (!response.ok) throw new Error(await parseError(response));
     const job = await response.json();
     setProgress(job.progress, job.current_stage);
-    document.querySelector("#ingestionStatus").textContent = job.status === "completed"
-      ? "Validated" : job.status[0].toUpperCase() + job.status.slice(1);
+    const faceResult = document.querySelector("#faceResult");
+    if (job.status === "completed") {
+      faceResult.textContent = job.face_detected ? "Human face detected" : "No human face detected";
+      document.querySelector("#maximumFaces").textContent = job.maximum_face_count ?? "—";
+      document.querySelector("#sampledFrames").textContent = job.sampled_frame_count ?? "—";
+      document.querySelector("#averageConfidence").textContent = job.average_detection_confidence == null
+        ? "—" : `${(job.average_detection_confidence * 100).toFixed(1)}%`;
+      document.querySelector("#bestConfidence").textContent = job.best_detection_confidence == null
+        ? "—" : `${(job.best_detection_confidence * 100).toFixed(1)}%`;
+      document.querySelector("#inferenceDevice").textContent = job.inference_device ?? "—";
+    } else {
+      faceResult.textContent = job.status === "processing" ? "Detecting…" : "Not processed";
+    }
     if (job.video_duration) {
       const minutes = Math.floor(job.video_duration / 60);
       const seconds = Math.floor(job.video_duration % 60);
       document.querySelector(".duration").textContent =
         `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+      document.querySelector("#resultDuration").textContent = `${job.video_duration.toFixed(1)} s`;
     }
     if (job.status === "failed") throw new Error(job.error_message || "Video validation failed.");
     if (job.status === "completed") return;

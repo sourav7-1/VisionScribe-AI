@@ -1,79 +1,99 @@
 # VisionScribe AI
 
-VisionScribe AI is a privacy-conscious FastAPI application for securely ingesting an
-authorized video before future face-presence detection and timestamped transcription.
-It never identifies a person. Identity always remains **Unknown**.
+VisionScribe AI is a privacy-conscious FastAPI application that securely ingests an
+authorized video and uses SCRFD to detect whether at least one human face appears.
+Detection is not recognition: **Identity always remains Unknown**.
 
-## Phase 2 status
+## Phase 3 status
 
-Phase 2 is complete:
+Phase 3 is complete:
 
-- Chunked local upload and drag-and-drop
-- Direct public HTTP/HTTPS video URL ingestion
-- Extension, MIME type, size, stream, duration, and corruption validation
-- SSRF defenses for DNS results and every redirect target
-- Streaming remote downloads with timeouts, redirect limits, and size limits
-- FFprobe metadata inspection
-- SQLite processing-job creation and background processing
-- One-second frontend progress polling, local preview, status, duration, and safe errors
-- Temporary-file cleanup after success and failure
-- Structured API errors and configurable internal logging
+- Phase 2 upload, public-URL validation, FFprobe, polling, and cleanup are preserved.
+- OpenCV samples frames by timestamp instead of decoding every frame.
+- Only the SCRFD detection ONNX model is loaded; recognition models and embeddings are
+  never loaded, executed, generated, or stored.
+- The detector model is initialized lazily once per active provider and reused safely.
+- ONNX Runtime tries CUDA only when advertised, verifies the provider active in the real
+  model session, and falls back to CPU after initialization or inference failures.
+- Results include face presence, maximum visible faces, sampled frames, average and best
+  detection confidence, and the actual inference device.
+- Uploaded/downloaded video is deleted only after detection completes or fails.
+- The dashboard shows real polling results and keeps all transcript controls disabled.
 
-Face detection, identity recognition, CUDA inference, speech transcription, and AI model
-downloads are deliberately not part of Phase 2.
+Successful jobs end with:
+
+```text
+Face detection complete — ready for transcription in Phase 4
+```
+
+Face detection only confirms that the detector found a face-like region. It does not
+prove identity, liveness, or authenticity.
 
 ## Architecture and workflow
 
 ```text
-Browser dashboard
-  -> POST /api/jobs/upload or /api/jobs/url
-  -> FastAPI validation and SQLAlchemy job creation
-  -> HTTP 202 with job ID and polling URL
-  -> background streamed acquisition
-  -> FFprobe stream and duration validation
-  -> job completion/failure update
-  -> temporary-file deletion
-  -> GET /api/jobs/{job_id} polling
+Upload or direct public URL
+  -> secure Phase 2 acquisition and FFprobe validation
+  -> OpenCV timestamp sampling (bounded by MAX_SAMPLED_FRAMES)
+  -> detection-only SCRFD ONNX session
+  -> verified CUDA provider or automatic CPU fallback
+  -> numerical results saved to SQLite
+  -> temporary video deleted
+  -> browser receives results through GET /api/jobs/{id}
 ```
 
-A successful job ends with:
+FastAPI `BackgroundTasks` is suitable for local Version 1. A durable external job queue is
+required before multi-worker production deployment.
 
-```text
-Ingestion complete — ready for face detection in Phase 3
-```
+## Files
 
-## Phase 2 files
+Created in Phase 3:
 
-New:
+- `app/services/face_detection_service.py`
+- `app/utils/device_detection.py`
+- `tests/test_phase3.py`
+- `requirements-ai.txt`
+- `requirements-insightface.txt`
 
+Modified:
+
+- `app/config.py`
+- `app/database.py`
+- `app/main.py`
+- `app/models/processing_job.py`
 - `app/routes/jobs.py`
 - `app/schemas/job.py`
 - `app/services/job_service.py`
-- `app/services/video_service.py`
-- `app/utils/errors.py`
-- `app/utils/url_safety.py`
-- `tests/test_phase2.py`
-
-Updated:
-
-- `app/main.py`
-- `app/config.py`
-- `app/models/processing_job.py`
-- `templates/index.html`
+- `.env.example`
+- `.gitignore`
 - `static/css/app.css`
 - `static/js/app.js`
-- `.env.example`
+- `templates/index.html`
+- `tests/test_phase2.py`
+- `README.md`
 
-## Windows setup (all project files on D:)
+## Database migration
 
-PowerShell:
+Startup safely inspects an existing SQLite `processing_jobs` table. If required, it runs:
+
+```sql
+ALTER TABLE processing_jobs ADD COLUMN inference_device VARCHAR(16)
+```
+
+Existing records and Phase 2 fields are preserved. Do not delete the database.
+
+## Installation on D: (PowerShell)
 
 ```powershell
 cd D:\VisionScribe-AI-Phase-1
 .\.venv\Scripts\Activate.ps1
-$env:DEBUG = "false"
+$env:VISIONSCRIBE_DEBUG = "false"
+$env:PIP_CACHE_DIR = "D:\VisionScribe-AI-Phase-1\.cache\pip"
+$env:TEMP = "D:\VisionScribe-AI-Phase-1\temp\pip"
+$env:TMP = $env:TEMP
 python -m pip install -r requirements-dev.txt
-python -m uvicorn app.main:app --reload
+python -m pip install -r requirements-ai.txt
+python -m pip install --no-deps -r requirements-insightface.txt
 ```
 
 Command Prompt:
@@ -81,79 +101,123 @@ Command Prompt:
 ```cmd
 cd /d D:\VisionScribe-AI-Phase-1
 .venv\Scripts\activate.bat
-set DEBUG=false
+set VISIONSCRIBE_DEBUG=false
+set PIP_CACHE_DIR=D:\VisionScribe-AI-Phase-1\.cache\pip
+set TEMP=D:\VisionScribe-AI-Phase-1\temp\pip
+set TMP=D:\VisionScribe-AI-Phase-1\temp\pip
 python -m pip install -r requirements-dev.txt
-python -m uvicorn app.main:app --reload
+python -m pip install -r requirements-ai.txt
+python -m pip install --no-deps -r requirements-insightface.txt
 ```
 
-Open <http://127.0.0.1:8000>. API documentation is at
-<http://127.0.0.1:8000/docs>.
+The two-step InsightFace installation is intentional. Its metadata requests CPU
+`onnxruntime` and GUI `opencv-python`; this project instead keeps only
+`onnxruntime-gpu` (which includes CPU fallback) and `opencv-python-headless`.
+
+If InsightFace cannot install on another Windows machine, update pip first. InsightFace
+1.0.1 is a pure Python wheel and does not build its optional Face3D C++ extension by
+default. Older InsightFace releases may require Microsoft C++ Build Tools.
+
+## Model cache and license
+
+The official InsightFace mechanism downloads `buffalo_l` once beneath:
+
+```text
+D:\VisionScribe-AI-Phase-1\models\models\buffalo_l
+```
+
+`FACE_MODEL_ROOT` and `FACE_MODEL_NAME` are configurable. The application directly loads
+only the SCRFD detector file (`det_10g.onnx`). It does not load recognition, gender/age,
+or landmark models contained in the pack.
+
+InsightFace library code is MIT licensed, but its provided pretrained model packs are
+restricted to non-commercial research use. Confirm licensing before commercial use.
+
+## Configuration
+
+```env
+FRAME_SAMPLE_INTERVAL_SECONDS=1.0
+MAX_SAMPLED_FRAMES=600
+FACE_DETECTION_THRESHOLD=0.50
+FACE_DETECTION_SIZE=640
+FACE_MODEL_NAME=buffalo_l
+FACE_MODEL_ROOT=models
+FACE_DEVICE=auto
+```
+
+`FACE_DEVICE` accepts `auto`, `cuda`, or `cpu`. Even when `cuda` is requested, the
+application safely uses CPU if CUDA cannot become active.
+
+## CUDA verification
+
+```cmd
+nvidia-smi
+python --version
+python -c "import onnxruntime as ort; print(ort.get_available_providers())"
+```
+
+Provider listing alone is not proof that a model session can load CUDA. This project also
+checks `detector.session.get_providers()` after SCRFD initialization.
+
+On the verified development machine, ONNX Runtime advertises CUDA, but the model session
+falls back to CPU because `cublasLt64_13.dll` is missing. ONNX Runtime 1.27 requires CUDA
+13.x and cuDNN 9.x. CPU detection remains fully operational. Install matching CUDA/cuDNN
+runtime DLLs and verify the active model session before claiming GPU acceleration; the
+NVIDIA driver or `nvidia-smi` alone is insufficient.
+
+CPU-only alternative: replace `onnxruntime-gpu` with `onnxruntime` in a separate
+environment and set `FACE_DEVICE=cpu`. Never install both runtime packages together.
 
 ## FFmpeg and FFprobe
 
-Check availability:
-
-```cmd
-ffmpeg -version
-ffprobe -version
-```
-
-The default Phase 2 configuration supports project-local FFprobe at:
+Phase 2 still requires `ffprobe`. Configure `FFPROBE_BINARY` or place the portable binary
+at:
 
 ```text
 D:\VisionScribe-AI-Phase-1\tools\ffmpeg\bin\ffprobe.exe
 ```
 
-Alternatively, install system-wide with:
+System-wide alternative:
 
 ```cmd
 winget install --id Gyan.FFmpeg
 ```
 
-Never hardcode a personal machine path. Configure `FFPROBE_BINARY` when the executable is
-elsewhere.
+## API result
 
-## Environment configuration
+`GET /api/jobs/{job_id}` returns, among other Phase 2 metadata:
 
-Copy `.env.example` to `.env` only if `.env` does not already exist. Never overwrite a
-personalized `.env`.
-
-New Phase 2 settings:
-
-```env
-LOG_LEVEL=INFO
-URL_DOWNLOAD_TIMEOUT_SECONDS=120
-MAX_URL_REDIRECTS=3
-UPLOAD_CHUNK_SIZE_BYTES=1048576
-FFPROBE_BINARY=tools/ffmpeg/bin/ffprobe.exe
+```json
+{
+  "job_id": "job-id",
+  "status": "completed",
+  "progress": 100,
+  "current_stage": "Face detection complete — ready for transcription in Phase 4",
+  "face_detected": true,
+  "maximum_face_count": 2,
+  "sampled_frame_count": 30,
+  "average_detection_confidence": 0.87,
+  "best_detection_confidence": 0.96,
+  "inference_device": "CPU",
+  "detected_language": null,
+  "transcript_json": null,
+  "error_message": null
+}
 ```
 
-Existing limits remain configurable through `MAX_UPLOAD_SIZE_MB`,
-`MAX_VIDEO_DURATION_SECONDS`, `REQUEST_TIMEOUT_SECONDS`, `TEMP_DIR`, and `CORS_ORIGINS`.
+Detection confidence only describes detector confidence that a bounding box contains a
+face-like region. It is never identity, liveness, authenticity, or verification confidence.
 
-## API examples
-
-PowerShell upload:
+## Run and verify
 
 ```powershell
-curl.exe -F "video=@D:\videos\authorized.mp4" http://127.0.0.1:8000/api/jobs/upload
+cd D:\VisionScribe-AI-Phase-1
+.\.venv\Scripts\Activate.ps1
+$env:VISIONSCRIBE_DEBUG = "false"
+python -m uvicorn app.main:app --reload
 ```
 
-Public URL:
-
-```powershell
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/jobs/url `
-  -ContentType application/json `
-  -Body '{"url":"https://example.com/video.mp4"}'
-```
-
-Poll a job:
-
-```powershell
-Invoke-RestMethod http://127.0.0.1:8000/api/jobs/JOB_ID
-```
-
-## Tests and verification
+Open <http://127.0.0.1:8000>.
 
 ```powershell
 pytest -q
@@ -162,24 +226,26 @@ python -m compileall app
 node --check static/js/app.js
 ```
 
-Tests mock public downloads and do not depend on an external website. Media is never added
-to the repository as a large permanent fixture.
+## Troubleshooting
 
-## Security and privacy
+- `FFprobe is unavailable`: set `FFPROBE_BINARY` to a working executable.
+- `Face detector model could not be loaded`: verify the model cache and its license.
+- CUDA is listed but results say CPU: CUDA/cuDNN DLLs could not activate in the real model
+  session; CPU fallback is expected.
+- `No video frames could be decoded`: confirm OpenCV supports the video's codec.
+- OpenCV DLL import errors: install the current Microsoft Visual C++ Redistributable.
+
+## Privacy limitations
 
 - Process only content you own or are authorized to use.
-- Only direct public HTTP/HTTPS video URLs are supported.
-- Localhost, private, link-local, loopback, reserved, and credential-bearing URLs are
-  rejected; redirect targets are checked again.
-- Login-required, private, authenticated, and DRM-protected media is not bypassed.
-- Downloads and uploads are streamed with configured time and size limits.
-- Video bytes are never stored in the database.
-- Temporary media is deleted after successful and failed processing.
-- Sensitive URLs, credentials, and video bytes are not logged.
-- Future UI terminology will be “Human face detected” or “No human face detected.”
-- Face presence never proves identity, liveness, or authenticity.
+- No sampled frame, face crop, coordinate, embedding, biometric template, or identity is
+  stored.
+- Frames live only in memory for the minimum inference duration.
+- Temporary videos are deleted after success and failure.
+- Identity always remains Unknown.
+- Detection does not prove identity, liveness, authenticity, or authorization.
 
-## Phase 3 preview
+## Phase 4 preview
 
-Phase 3 will add sampled-frame human-face presence detection while keeping
-`Identity: Unknown`. It will not be started without confirmation.
+Phase 4 will add speech extraction and timestamped transcription. It is not implemented
+and must not start without confirmation.

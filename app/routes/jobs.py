@@ -74,6 +74,7 @@ def get_job(job_id: str, db: Annotated[Session, Depends(get_db)]) -> JobResponse
         error = AppError("unknown_job", "The requested processing job was not found.", 404)
         raise http_error(error)
     return JobResponse(
+        id=job.id,
         job_id=job.id,
         source_type=job.source_type,
         original_filename=job.original_filename,
@@ -87,7 +88,9 @@ def get_job(job_id: str, db: Annotated[Session, Depends(get_db)]) -> JobResponse
         sampled_frame_count=job.sampled_frame_count,
         average_detection_confidence=job.average_detection_confidence,
         best_detection_confidence=job.best_detection_confidence,
+        inference_device=job.inference_device,
         detected_language=job.detected_language,
+        transcript_json=job.transcript_json,
         error_message=job.error_message,
         created_at=job.created_at,
         completed_at=job.completed_at,

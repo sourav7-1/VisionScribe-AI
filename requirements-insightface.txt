@@ -1,0 +1,4 @@
+# Install this file with --no-deps after requirements-ai.txt. InsightFace declares
+# CPU ONNX Runtime and GUI OpenCV dependencies; VisionScribe intentionally uses
+# onnxruntime-gpu (which includes CPU fallback) and opencv-python-headless instead.
+insightface==1.0.1

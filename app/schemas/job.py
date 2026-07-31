@@ -16,6 +16,7 @@ class JobAccepted(BaseModel):
 class JobResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    id: str
     job_id: str
     source_type: str
     original_filename: str | None
@@ -29,8 +30,9 @@ class JobResponse(BaseModel):
     sampled_frame_count: int | None
     average_detection_confidence: float | None
     best_detection_confidence: float | None
+    inference_device: str | None
     detected_language: str | None
+    transcript_json: list[dict] | None
     error_message: str | None
     created_at: datetime
     completed_at: datetime | None
-

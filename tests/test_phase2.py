@@ -9,6 +9,7 @@ from app.database import SessionLocal
 from app.main import app
 from app.models.processing_job import ProcessingJob
 from app.services import job_service
+from app.services.face_detection_service import FaceDetectionResult
 from app.services.job_service import create_job
 from app.services.video_service import probe_video
 from app.utils.errors import AppError
@@ -150,6 +151,11 @@ def test_background_completion_and_cleanup(
         }
 
     monkeypatch.setattr(job_service, "probe_video", successful_probe)
+    monkeypatch.setattr(
+        job_service,
+        "detect_faces_in_video",
+        lambda *_: FaceDetectionResult(False, 0, 1, None, None, "CPU"),
+    )
     asyncio.run(job_service.process_job(job_id, path))
     with SessionLocal() as db:
         result = db.get(ProcessingJob, job_id)
@@ -157,9 +163,9 @@ def test_background_completion_and_cleanup(
         assert result.status == "completed"
         assert result.progress == 100
         assert result.video_duration == 3.5
-        assert "Phase 3" in result.current_stage
+        assert "Phase 4" in result.current_stage
     assert not path.exists()
 
 
 def test_openapi_version(client: TestClient) -> None:
-    assert client.get("/openapi.json").json()["info"]["version"] == "0.2.0"
+    assert client.get("/openapi.json").json()["info"]["version"] == "0.3.0"
