@@ -168,4 +168,4 @@ def test_background_completion_and_cleanup(
 
 
 def test_openapi_version(client: TestClient) -> None:
-    assert client.get("/openapi.json").json()["info"]["version"] == "0.4.0"
+    assert client.get("/openapi.json").json()["info"]["version"] == "0.5.0"

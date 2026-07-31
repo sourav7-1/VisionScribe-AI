@@ -275,6 +275,6 @@ def test_frontend_safe_chat_and_seek() -> None:
         javascript = client.get("/static/js/app.js").text
     assert "Identity" in html and "Unknown" in html
     assert "text.textContent = segment.text" in javascript
-    assert "preview.currentTime = segment.start" in javascript
+    assert "preview.currentTime = Math.min" in javascript
     assert "Person 1" in javascript
     assert "innerHTML" not in javascript

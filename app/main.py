@@ -12,6 +12,7 @@ from app.config import PROJECT_ROOT, get_settings
 from app.database import initialize_database
 from app.routes.health import router as health_router
 from app.routes.jobs import router as jobs_router
+from app.routes.transcript import router as transcript_router
 
 settings = get_settings()
 logging.basicConfig(level=getattr(logging, settings.log_level.upper(), logging.INFO))
@@ -27,7 +28,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.4.0",
+    version="0.5.0",
     description="Face-presence detection and timestamped video transcription.",
     debug=settings.debug,
     lifespan=lifespan,
@@ -42,6 +43,7 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory=PROJECT_ROOT / "static"), name="static")
 app.include_router(health_router)
 app.include_router(jobs_router)
+app.include_router(transcript_router)
 
 
 @app.exception_handler(HTTPException)

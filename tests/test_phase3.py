@@ -315,7 +315,7 @@ def test_frontend_identity_and_disabled_transcript() -> None:
         html = client.get("/").text
     assert "Identity" in html and "Unknown" in html
     assert "detection confidence" in html.lower()
-    assert "Search · Phase 5" in html
+    assert "Search transcript" in html
     assert "disabled" in html
 
 

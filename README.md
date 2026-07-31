@@ -1,26 +1,86 @@
 # VisionScribe AI
 
-VisionScribe AI 0.4.0 is a privacy-conscious local FastAPI application for authorized
-video analysis. It performs detection-only face analysis and timestamped speech-to-text.
-Face detection is not recognition: identity always remains **Unknown**.
+VisionScribe AI 0.5.0 is a privacy-conscious local FastAPI dashboard for authorized
+video analysis. It detects human-face presence with SCRFD and transcribes Bengali,
+English, or mixed speech with Faster-Whisper. Identity always remains **Unknown**.
 
-## Phase 4 workflow
+Phase 5 completes the integrated user experience. It does not add recognition,
+diarization, face/voice matching, an LLM, or another AI model.
+
+## Complete workflow
 
 ```text
-upload or public URL
-  -> validated temporary video
-  -> sampled SCRFD face detection
-  -> FFmpeg mono 16 kHz WAV extraction
-  -> Faster-Whisper transcription (CUDA, then safe CPU fallback)
-  -> language, timestamps, and "Person 1" segments saved to SQLite
-  -> temporary audio and video deleted
+upload or safe direct public URL
+  -> validated temporary video and metadata
+  -> sampled detection-only face analysis
+  -> optional mono 16 kHz audio extraction
+  -> timestamped local transcription
+  -> face and transcript results saved to SQLite
+  -> temporary audio/video deleted
+  -> local search, copy, TXT/JSON/SRT download, seeking, and clear
 ```
 
-Transcription normally runs only when a face was detected. Set
-`TRANSCRIBE_WITHOUT_FACE=true` to override this. There is no diarization, speaker
-identification, recognition, embedding generation, or face/voice association. A
-transcription or audio failure is reported as a warning and preserves successful face
-results.
+The frontend prevents duplicate submissions, ignores stale polling responses, keeps
+progress monotonic, stops polling on terminal states, and permits safe retry after a
+server or network failure. A transcription warning preserves valid face results.
+
+## Phase 5 transcript tools
+
+- Search is local, debounced, case-insensitive for English, Unicode-safe for Bengali,
+  and highlights matches using DOM text nodes and `<mark>`—never unsafe HTML.
+- Copy includes detected language, `Identity: Unknown`, and the complete unfiltered
+  transcript. It uses the Clipboard API with a browser fallback.
+- Timestamp buttons wait for video metadata, clamp the seek to the playable duration,
+  handle autoplay rejection, and track the active segment with `timeupdate`.
+- Clear stops the current polling generation, revokes object URLs, resets every result
+  and control, and does not delete historical database jobs.
+
+Uploaded videos use a browser object URL for preview; old and final URLs are revoked.
+Direct public URLs are previewed only when the browser supports them. CORS, login, and
+DRM restrictions are never bypassed. If preview fails, timestamps remain readable but
+seeking is unavailable.
+
+## Transcript downloads
+
+```http
+GET /api/jobs/{job_id}/transcript.txt
+GET /api/jobs/{job_id}/transcript.json
+GET /api/jobs/{job_id}/transcript.srt
+```
+
+Exports are generated in memory as UTF-8 and never create persistent files. Filenames
+are sanitized and include a short job ID. Unknown jobs return structured `404` errors;
+incomplete, failed, or empty transcripts return structured `409` errors.
+
+- TXT is human-readable and includes product title, `Identity: Unknown`, language,
+  duration, and one timestamped `Person 1` segment per line.
+- JSON contains only public result metadata and raw numeric segment timestamps. It does
+  not expose source URLs, media paths, or model paths.
+- SRT uses sequential blocks and validated `HH:MM:SS,mmm` ranges. It omits speaker
+  identity and supports videos longer than one hour.
+
+Example JSON:
+
+```json
+{
+  "job_id": "job-id",
+  "identity": "Unknown",
+  "face_detected": true,
+  "detected_language": "bn",
+  "transcription_status": "completed",
+  "segments": [
+    {"id": 1, "start": 3.12, "end": 8.75, "speaker": "Person 1", "text": "সবাইকে স্বাগতম।"}
+  ]
+}
+```
+
+## Accessibility and responsive behavior
+
+The dashboard includes real labels, keyboard tabs and timestamp buttons, visible focus
+styles, progress/action live regions, alert semantics, accessible disabled states, and
+an announced search result count. Reduced-motion preferences are respected. Result
+cards, search controls, action buttons, filenames, and Bengali text wrap on laptop,
+tablet, and mobile layouts without horizontal overflow.
 
 ## Install entirely on D: (PowerShell)
 
@@ -38,43 +98,10 @@ python -m pip install --no-deps -r requirements-whisper.txt
 python -m pip install --no-deps -r requirements-insightface.txt
 ```
 
-FFmpeg is already supported through PATH/winget discovery. If needed:
-
-```powershell
-winget install --id Gyan.FFmpeg
-```
-
-Faster-Whisper model files download once to
-`D:\VisionScribe-AI-Phase-1\models\whisper`. The default `medium` model is sizeable;
-set `WHISPER_MODEL=tiny` for a small smoke test before starting the app. InsightFace's
-detection model remains under the project `models` directory.
-
-The `--no-deps` steps are intentional. Both InsightFace and Faster-Whisper declare
-runtime variants that would otherwise install CPU `onnxruntime` beside
-`onnxruntime-gpu`. `requirements-ai.txt` explicitly supplies their compatible runtime
-dependencies while retaining one ONNX Runtime package with CUDA and CPU providers.
-
-## Configuration
-
-Copy `.env.example` to `.env`. Important Phase 4 settings are:
-
-```env
-FFMPEG_BINARY=ffmpeg
-WHISPER_MODEL=medium
-WHISPER_DEVICE=auto
-WHISPER_COMPUTE_TYPE=auto
-WHISPER_CPU_COMPUTE_TYPE=int8
-WHISPER_CUDA_COMPUTE_TYPE=float16
-WHISPER_DOWNLOAD_ROOT=models/whisper
-WHISPER_LANGUAGE=
-TRANSCRIBE_WITHOUT_FACE=false
-AUDIO_SAMPLE_RATE=16000
-AUDIO_CHANNELS=1
-```
-
-An empty `WHISPER_LANGUAGE` enables automatic language detection. Use `bn` or `en` to
-force Bengali or English. CUDA is attempted only when CTranslate2 reports compatible
-support; initialization or inference failure retries once on CPU with int8.
+The `--no-deps` steps prevent CPU `onnxruntime` from being installed alongside the
+project's `onnxruntime-gpu`, which already supplies CPU fallback. FFmpeg is discovered
+from the project, PATH, or winget installation. All configured cache/model/temp paths
+remain inside the project on `D:`.
 
 ## Run
 
@@ -85,34 +112,7 @@ $env:VISIONSCRIBE_DEBUG = "false"
 python -m uvicorn app.main:app --reload
 ```
 
-Open <http://127.0.0.1:8000>. Transcript timestamp buttons seek the local video preview.
-Transcript text is inserted with DOM `textContent`, so transcribed markup is never
-interpreted as HTML.
-
-## API result
-
-`GET /api/jobs/{job_id}` retains all Phase 2/3 fields and adds:
-
-```json
-{
-  "status": "completed",
-  "face_detected": true,
-  "inference_device": "CPU",
-  "transcription_status": "completed",
-  "transcription_device": "CPU",
-  "detected_language": "bn",
-  "language_probability": 0.97,
-  "audio_duration": 12.4,
-  "transcription_segment_count": 2,
-  "transcript_json": [
-    {"id": 0, "start": 0.0, "end": 3.2, "text": "স্বাগতম।", "speaker": "Person 1"}
-  ],
-  "transcription_warning": null
-}
-```
-
-Startup performs additive, idempotent SQLite migration for the new columns. Existing
-records and all earlier fields are preserved; do not delete the database.
+Open <http://127.0.0.1:8000>.
 
 ## Verify
 
@@ -123,24 +123,39 @@ pytest -q --basetemp D:\VisionScribe-AI-Phase-1\temp\pytest
 ruff check app tests
 python -m compileall app
 node --check static/js/app.js
-python -c "import ctranslate2; print(ctranslate2.get_supported_compute_types('cpu'))"
-python -c "import ctranslate2; print(ctranslate2.get_supported_compute_types('cuda'))"
 ```
 
-CTranslate2's CUDA check is the relevant Whisper capability check. A visible NVIDIA GPU
-or a CUDA provider in ONNX Runtime does not guarantee that the required CUDA/cuDNN DLLs
-for CTranslate2 are installed. CPU fallback is an expected supported mode.
+Useful API checks:
 
-## Privacy and limitations
+```powershell
+Invoke-WebRequest http://127.0.0.1:8000/api/health
+Invoke-WebRequest http://127.0.0.1:8000/
+Invoke-RestMethod http://127.0.0.1:8000/openapi.json
+```
 
-- Process only videos you own or are authorized to use.
-- Face frames, crops, coordinates, embeddings, biometric templates, and voiceprints are
-  not stored.
-- Audio and video working files are deleted after the whole job, including warning and
-  failure paths.
-- Transcript text and numerical detection metadata remain in SQLite as job results.
-- "Person 1" is a neutral label, not an identified or diarized person.
-- Detection does not prove identity, liveness, authenticity, or authorization.
+## Error, warning, privacy, and limitations
 
-InsightFace code is MIT licensed, while its supplied pretrained model packs have
-non-commercial research restrictions. Confirm model licensing before commercial use.
+Fatal ingestion/detection errors are displayed separately from warnings. No-audio,
+no-speech, skipped transcription, browser-preview failure, clipboard denial, and
+transcription failure are warnings and never masquerade as successful transcription.
+Stack traces, credentials, internal paths, and source URLs are not exposed in exports.
+
+- Process only media you own or are authorized to use.
+- Sampled frames, face crops, face/voice embeddings, biometric templates, uploaded
+  videos, and extracted WAV files are not stored permanently.
+- Transcript text and numerical job results remain in SQLite.
+- `Person 1` is a neutral single-speaker label, not identification or diarization.
+- Face detection does not prove identity, liveness, or authenticity.
+- Transcription does not prove that a detected face produced the speech.
+- Model output can be wrong, especially with noise, accents, and mixed languages.
+- FastAPI background tasks are suitable for this local version, not durable multi-worker
+  production processing.
+
+InsightFace's supplied pretrained model packs have non-commercial research licensing
+restrictions; confirm licensing before commercial use.
+
+## Phase 6 preview
+
+Phase 6 will cover final hardening, deployment review, release validation, and
+production-readiness decisions. Phase 5 is complete but the project is not marked
+production-ready.
