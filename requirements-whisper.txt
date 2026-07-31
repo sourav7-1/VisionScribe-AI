@@ -1,0 +1,3 @@
+# Install with --no-deps: the ONNX Runtime metadata conflicts with the Phase 3
+# onnxruntime-gpu package on Windows. requirements-ai.txt supplies the dependencies.
+faster-whisper==1.2.1

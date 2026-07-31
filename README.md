@@ -1,214 +1,82 @@
 # VisionScribe AI
 
-VisionScribe AI is a privacy-conscious FastAPI application that securely ingests an
-authorized video and uses SCRFD to detect whether at least one human face appears.
-Detection is not recognition: **Identity always remains Unknown**.
+VisionScribe AI 0.4.0 is a privacy-conscious local FastAPI application for authorized
+video analysis. It performs detection-only face analysis and timestamped speech-to-text.
+Face detection is not recognition: identity always remains **Unknown**.
 
-## Phase 3 status
-
-Phase 3 is complete:
-
-- Phase 2 upload, public-URL validation, FFprobe, polling, and cleanup are preserved.
-- OpenCV samples frames by timestamp instead of decoding every frame.
-- Only the SCRFD detection ONNX model is loaded; recognition models and embeddings are
-  never loaded, executed, generated, or stored.
-- The detector model is initialized lazily once per active provider and reused safely.
-- ONNX Runtime tries CUDA only when advertised, verifies the provider active in the real
-  model session, and falls back to CPU after initialization or inference failures.
-- Results include face presence, maximum visible faces, sampled frames, average and best
-  detection confidence, and the actual inference device.
-- Uploaded/downloaded video is deleted only after detection completes or fails.
-- The dashboard shows real polling results and keeps all transcript controls disabled.
-
-Successful jobs end with:
+## Phase 4 workflow
 
 ```text
-Face detection complete — ready for transcription in Phase 4
+upload or public URL
+  -> validated temporary video
+  -> sampled SCRFD face detection
+  -> FFmpeg mono 16 kHz WAV extraction
+  -> Faster-Whisper transcription (CUDA, then safe CPU fallback)
+  -> language, timestamps, and "Person 1" segments saved to SQLite
+  -> temporary audio and video deleted
 ```
 
-Face detection only confirms that the detector found a face-like region. It does not
-prove identity, liveness, or authenticity.
+Transcription normally runs only when a face was detected. Set
+`TRANSCRIBE_WITHOUT_FACE=true` to override this. There is no diarization, speaker
+identification, recognition, embedding generation, or face/voice association. A
+transcription or audio failure is reported as a warning and preserves successful face
+results.
 
-## Architecture and workflow
-
-```text
-Upload or direct public URL
-  -> secure Phase 2 acquisition and FFprobe validation
-  -> OpenCV timestamp sampling (bounded by MAX_SAMPLED_FRAMES)
-  -> detection-only SCRFD ONNX session
-  -> verified CUDA provider or automatic CPU fallback
-  -> numerical results saved to SQLite
-  -> temporary video deleted
-  -> browser receives results through GET /api/jobs/{id}
-```
-
-FastAPI `BackgroundTasks` is suitable for local Version 1. A durable external job queue is
-required before multi-worker production deployment.
-
-## Files
-
-Created in Phase 3:
-
-- `app/services/face_detection_service.py`
-- `app/utils/device_detection.py`
-- `tests/test_phase3.py`
-- `requirements-ai.txt`
-- `requirements-insightface.txt`
-
-Modified:
-
-- `app/config.py`
-- `app/database.py`
-- `app/main.py`
-- `app/models/processing_job.py`
-- `app/routes/jobs.py`
-- `app/schemas/job.py`
-- `app/services/job_service.py`
-- `.env.example`
-- `.gitignore`
-- `static/css/app.css`
-- `static/js/app.js`
-- `templates/index.html`
-- `tests/test_phase2.py`
-- `README.md`
-
-## Database migration
-
-Startup safely inspects an existing SQLite `processing_jobs` table. If required, it runs:
-
-```sql
-ALTER TABLE processing_jobs ADD COLUMN inference_device VARCHAR(16)
-```
-
-Existing records and Phase 2 fields are preserved. Do not delete the database.
-
-## Installation on D: (PowerShell)
+## Install entirely on D: (PowerShell)
 
 ```powershell
 cd D:\VisionScribe-AI-Phase-1
+python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-$env:VISIONSCRIBE_DEBUG = "false"
+New-Item -ItemType Directory -Force .cache\pip,temp\pip,models\whisper | Out-Null
 $env:PIP_CACHE_DIR = "D:\VisionScribe-AI-Phase-1\.cache\pip"
 $env:TEMP = "D:\VisionScribe-AI-Phase-1\temp\pip"
 $env:TMP = $env:TEMP
 python -m pip install -r requirements-dev.txt
 python -m pip install -r requirements-ai.txt
+python -m pip install --no-deps -r requirements-whisper.txt
 python -m pip install --no-deps -r requirements-insightface.txt
 ```
 
-Command Prompt:
+FFmpeg is already supported through PATH/winget discovery. If needed:
 
-```cmd
-cd /d D:\VisionScribe-AI-Phase-1
-.venv\Scripts\activate.bat
-set VISIONSCRIBE_DEBUG=false
-set PIP_CACHE_DIR=D:\VisionScribe-AI-Phase-1\.cache\pip
-set TEMP=D:\VisionScribe-AI-Phase-1\temp\pip
-set TMP=D:\VisionScribe-AI-Phase-1\temp\pip
-python -m pip install -r requirements-dev.txt
-python -m pip install -r requirements-ai.txt
-python -m pip install --no-deps -r requirements-insightface.txt
-```
-
-The two-step InsightFace installation is intentional. Its metadata requests CPU
-`onnxruntime` and GUI `opencv-python`; this project instead keeps only
-`onnxruntime-gpu` (which includes CPU fallback) and `opencv-python-headless`.
-
-If InsightFace cannot install on another Windows machine, update pip first. InsightFace
-1.0.1 is a pure Python wheel and does not build its optional Face3D C++ extension by
-default. Older InsightFace releases may require Microsoft C++ Build Tools.
-
-## Model cache and license
-
-The official InsightFace mechanism downloads `buffalo_l` once beneath:
-
-```text
-D:\VisionScribe-AI-Phase-1\models\models\buffalo_l
-```
-
-`FACE_MODEL_ROOT` and `FACE_MODEL_NAME` are configurable. The application directly loads
-only the SCRFD detector file (`det_10g.onnx`). It does not load recognition, gender/age,
-or landmark models contained in the pack.
-
-InsightFace library code is MIT licensed, but its provided pretrained model packs are
-restricted to non-commercial research use. Confirm licensing before commercial use.
-
-## Configuration
-
-```env
-FRAME_SAMPLE_INTERVAL_SECONDS=1.0
-MAX_SAMPLED_FRAMES=600
-FACE_DETECTION_THRESHOLD=0.50
-FACE_DETECTION_SIZE=640
-FACE_MODEL_NAME=buffalo_l
-FACE_MODEL_ROOT=models
-FACE_DEVICE=auto
-```
-
-`FACE_DEVICE` accepts `auto`, `cuda`, or `cpu`. Even when `cuda` is requested, the
-application safely uses CPU if CUDA cannot become active.
-
-## CUDA verification
-
-```cmd
-nvidia-smi
-python --version
-python -c "import onnxruntime as ort; print(ort.get_available_providers())"
-```
-
-Provider listing alone is not proof that a model session can load CUDA. This project also
-checks `detector.session.get_providers()` after SCRFD initialization.
-
-On the verified development machine, ONNX Runtime advertises CUDA, but the model session
-falls back to CPU because `cublasLt64_13.dll` is missing. ONNX Runtime 1.27 requires CUDA
-13.x and cuDNN 9.x. CPU detection remains fully operational. Install matching CUDA/cuDNN
-runtime DLLs and verify the active model session before claiming GPU acceleration; the
-NVIDIA driver or `nvidia-smi` alone is insufficient.
-
-CPU-only alternative: replace `onnxruntime-gpu` with `onnxruntime` in a separate
-environment and set `FACE_DEVICE=cpu`. Never install both runtime packages together.
-
-## FFmpeg and FFprobe
-
-Phase 2 still requires `ffprobe`. Configure `FFPROBE_BINARY` or place the portable binary
-at:
-
-```text
-D:\VisionScribe-AI-Phase-1\tools\ffmpeg\bin\ffprobe.exe
-```
-
-System-wide alternative:
-
-```cmd
+```powershell
 winget install --id Gyan.FFmpeg
 ```
 
-## API result
+Faster-Whisper model files download once to
+`D:\VisionScribe-AI-Phase-1\models\whisper`. The default `medium` model is sizeable;
+set `WHISPER_MODEL=tiny` for a small smoke test before starting the app. InsightFace's
+detection model remains under the project `models` directory.
 
-`GET /api/jobs/{job_id}` returns, among other Phase 2 metadata:
+The `--no-deps` steps are intentional. Both InsightFace and Faster-Whisper declare
+runtime variants that would otherwise install CPU `onnxruntime` beside
+`onnxruntime-gpu`. `requirements-ai.txt` explicitly supplies their compatible runtime
+dependencies while retaining one ONNX Runtime package with CUDA and CPU providers.
 
-```json
-{
-  "job_id": "job-id",
-  "status": "completed",
-  "progress": 100,
-  "current_stage": "Face detection complete — ready for transcription in Phase 4",
-  "face_detected": true,
-  "maximum_face_count": 2,
-  "sampled_frame_count": 30,
-  "average_detection_confidence": 0.87,
-  "best_detection_confidence": 0.96,
-  "inference_device": "CPU",
-  "detected_language": null,
-  "transcript_json": null,
-  "error_message": null
-}
+## Configuration
+
+Copy `.env.example` to `.env`. Important Phase 4 settings are:
+
+```env
+FFMPEG_BINARY=ffmpeg
+WHISPER_MODEL=medium
+WHISPER_DEVICE=auto
+WHISPER_COMPUTE_TYPE=auto
+WHISPER_CPU_COMPUTE_TYPE=int8
+WHISPER_CUDA_COMPUTE_TYPE=float16
+WHISPER_DOWNLOAD_ROOT=models/whisper
+WHISPER_LANGUAGE=
+TRANSCRIBE_WITHOUT_FACE=false
+AUDIO_SAMPLE_RATE=16000
+AUDIO_CHANNELS=1
 ```
 
-Detection confidence only describes detector confidence that a bounding box contains a
-face-like region. It is never identity, liveness, authenticity, or verification confidence.
+An empty `WHISPER_LANGUAGE` enables automatic language detection. Use `bn` or `en` to
+force Bengali or English. CUDA is attempted only when CTranslate2 reports compatible
+support; initialization or inference failure retries once on CPU with int8.
 
-## Run and verify
+## Run
 
 ```powershell
 cd D:\VisionScribe-AI-Phase-1
@@ -217,35 +85,62 @@ $env:VISIONSCRIBE_DEBUG = "false"
 python -m uvicorn app.main:app --reload
 ```
 
-Open <http://127.0.0.1:8000>.
+Open <http://127.0.0.1:8000>. Transcript timestamp buttons seek the local video preview.
+Transcript text is inserted with DOM `textContent`, so transcribed markup is never
+interpreted as HTML.
+
+## API result
+
+`GET /api/jobs/{job_id}` retains all Phase 2/3 fields and adds:
+
+```json
+{
+  "status": "completed",
+  "face_detected": true,
+  "inference_device": "CPU",
+  "transcription_status": "completed",
+  "transcription_device": "CPU",
+  "detected_language": "bn",
+  "language_probability": 0.97,
+  "audio_duration": 12.4,
+  "transcription_segment_count": 2,
+  "transcript_json": [
+    {"id": 0, "start": 0.0, "end": 3.2, "text": "স্বাগতম।", "speaker": "Person 1"}
+  ],
+  "transcription_warning": null
+}
+```
+
+Startup performs additive, idempotent SQLite migration for the new columns. Existing
+records and all earlier fields are preserved; do not delete the database.
+
+## Verify
 
 ```powershell
-pytest -q
+$env:TEMP = "D:\VisionScribe-AI-Phase-1\temp"
+$env:TMP = $env:TEMP
+pytest -q --basetemp D:\VisionScribe-AI-Phase-1\temp\pytest
 ruff check app tests
 python -m compileall app
 node --check static/js/app.js
+python -c "import ctranslate2; print(ctranslate2.get_supported_compute_types('cpu'))"
+python -c "import ctranslate2; print(ctranslate2.get_supported_compute_types('cuda'))"
 ```
 
-## Troubleshooting
+CTranslate2's CUDA check is the relevant Whisper capability check. A visible NVIDIA GPU
+or a CUDA provider in ONNX Runtime does not guarantee that the required CUDA/cuDNN DLLs
+for CTranslate2 are installed. CPU fallback is an expected supported mode.
 
-- `FFprobe is unavailable`: set `FFPROBE_BINARY` to a working executable.
-- `Face detector model could not be loaded`: verify the model cache and its license.
-- CUDA is listed but results say CPU: CUDA/cuDNN DLLs could not activate in the real model
-  session; CPU fallback is expected.
-- `No video frames could be decoded`: confirm OpenCV supports the video's codec.
-- OpenCV DLL import errors: install the current Microsoft Visual C++ Redistributable.
+## Privacy and limitations
 
-## Privacy limitations
-
-- Process only content you own or are authorized to use.
-- No sampled frame, face crop, coordinate, embedding, biometric template, or identity is
-  stored.
-- Frames live only in memory for the minimum inference duration.
-- Temporary videos are deleted after success and failure.
-- Identity always remains Unknown.
+- Process only videos you own or are authorized to use.
+- Face frames, crops, coordinates, embeddings, biometric templates, and voiceprints are
+  not stored.
+- Audio and video working files are deleted after the whole job, including warning and
+  failure paths.
+- Transcript text and numerical detection metadata remain in SQLite as job results.
+- "Person 1" is a neutral label, not an identified or diarized person.
 - Detection does not prove identity, liveness, authenticity, or authorization.
 
-## Phase 4 preview
-
-Phase 4 will add speech extraction and timestamped transcription. It is not implemented
-and must not start without confirmation.
+InsightFace code is MIT licensed, while its supplied pretrained model packs have
+non-commercial research restrictions. Confirm model licensing before commercial use.

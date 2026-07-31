@@ -30,6 +30,47 @@ function setProgress(progress, stage) {
   document.querySelector("#progressBar").style.width = `${progress}%`;
   document.querySelector("#progressStage").textContent = stage;
 }
+function formatTimestamp(seconds) {
+  const total = Math.max(0, Math.floor(seconds));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const secs = total % 60;
+  const base = `${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+  return hours ? `${String(hours).padStart(2, "0")}:${base}` : base;
+}
+function renderTranscript(job) {
+  const chat = document.querySelector("#transcriptChat");
+  const notice = document.querySelector("#transcriptionNotice");
+  chat.replaceChildren();
+  const segments = job.transcript_json || [];
+  if (!segments.length) {
+    chat.hidden = true;
+    notice.hidden = false;
+    const title = notice.querySelector("strong");
+    const detail = notice.querySelector("p");
+    if (job.transcription_status === "skipped") title.textContent = "Transcription skipped";
+    else if (job.transcription_status === "unavailable") title.textContent = "Transcription unavailable";
+    else if (job.transcription_status === "failed") title.textContent = "Transcription failed";
+    else title.textContent = "No speech was detected in this video.";
+    detail.textContent = job.transcription_warning || "No valid speech segments were produced.";
+    return;
+  }
+  notice.hidden = true;
+  chat.hidden = false;
+  segments.forEach((segment) => {
+    const article = document.createElement("article"); article.className = "chat-message";
+    const meta = document.createElement("div"); meta.className = "chat-meta";
+    const timestamp = document.createElement("button"); timestamp.type = "button";
+    timestamp.className = "timestamp-button"; timestamp.textContent = formatTimestamp(segment.start);
+    timestamp.addEventListener("click", () => { preview.currentTime = segment.start; preview.play(); });
+    const speaker = document.createElement("span"); speaker.className = "chat-speaker";
+    speaker.textContent = "Person 1";
+    const text = document.createElement("p"); text.className = "chat-text";
+    text.textContent = segment.text;
+    meta.append(timestamp, speaker); article.append(meta, text); chat.append(article);
+  });
+  chat.scrollTo({ top: 0, behavior: "smooth" });
+}
 function chooseFile(file) {
   selectedFile = file || null;
   clearError();
@@ -69,6 +110,11 @@ async function pollJob(pollUrl) {
       document.querySelector("#bestConfidence").textContent = job.best_detection_confidence == null
         ? "—" : `${(job.best_detection_confidence * 100).toFixed(1)}%`;
       document.querySelector("#inferenceDevice").textContent = job.inference_device ?? "—";
+      const languageNames = { bn: "Bengali", en: "English" };
+      document.querySelector("#detectedLanguage").textContent = job.detected_language
+        ? (languageNames[job.detected_language] || job.detected_language.toUpperCase()) : "—";
+      document.querySelector("#transcriptionDevice").textContent = job.transcription_device ?? "—";
+      renderTranscript(job);
     } else {
       faceResult.textContent = job.status === "processing" ? "Detecting…" : "Not processed";
     }

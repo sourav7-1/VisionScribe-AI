@@ -162,7 +162,7 @@ def detect_faces_in_video(
     provider_index = 0
     provider, device = candidates[provider_index]
     if progress_callback:
-        progress_callback(50, "Loading face detector")
+        progress_callback(35, "Loading face detector")
     try:
         try:
             detector = detector_manager.get_detector(provider, settings)
@@ -205,7 +205,7 @@ def detect_faces_in_video(
             frame_scores.append(scores)
             del frame
             if progress_callback:
-                progress = 60 + round(35 * (index + 1) / len(timestamps))
+                progress = 40 + round(15 * (index + 1) / len(timestamps))
                 progress_callback(progress, "Detecting human faces")
         if not frame_scores:
             raise AppError("no_decodable_frames", "No video frames could be decoded.")

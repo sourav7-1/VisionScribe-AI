@@ -7,3 +7,7 @@ requests==2.34.2
 scipy==1.17.1
 scikit-image==0.26.0
 tqdm==4.70.0
+ctranslate2==4.8.1
+av==18.0.0
+huggingface-hub==1.26.0
+tokenizers==0.23.1

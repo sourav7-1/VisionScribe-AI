@@ -62,8 +62,6 @@ async def probe_video(path: Path, settings: Settings) -> dict:
         raise AppError("corrupted_video", "The video metadata is invalid.") from exc
     if not video:
         raise AppError("missing_video_stream", "The file does not contain a video stream.")
-    if not audio:
-        raise AppError("missing_audio_stream", "The video does not contain an audio stream.")
     if duration <= 0:
         raise AppError("corrupted_video", "The video has an invalid duration.")
     if duration > settings.max_video_duration_seconds:
@@ -71,7 +69,8 @@ async def probe_video(path: Path, settings: Settings) -> dict:
     return {
         "duration": duration,
         "video_codec": video.get("codec_name"),
-        "audio_codec": audio.get("codec_name"),
+        "audio_codec": audio.get("codec_name") if audio else None,
+        "has_audio": audio is not None,
         "width": video.get("width"),
         "height": video.get("height"),
     }

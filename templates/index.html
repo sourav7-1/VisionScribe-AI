@@ -1,56 +1,7 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="VisionScribe AI securely validates authorized videos.">
-  <title>{{ app_name }}</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', path='/css/app.css') }}">
-</head>
-<body>
-  <div class="ambient ambient-one"></div><div class="ambient ambient-two"></div>
-  <header class="topbar">
-    <a class="brand" href="/" aria-label="VisionScribe AI home"><span class="brand-mark">V</span><span><strong>VisionScribe</strong><small>AI video intelligence</small></span></a>
-    <div class="system-status"><span class="status-dot"></span><span id="apiStatus">Checking system</span></div>
-  </header>
-  <main class="shell">
-    <section class="hero">
-      <div><span class="eyebrow">HUMAN-FACE PRESENCE DETECTION</span><h1>Turn video into a clear,<br><span>timestamped story.</span></h1><p>Securely validate an authorized video and detect whether at least one human face appears. Identity always remains Unknown.</p></div>
-      <div class="privacy-note"><span class="shield">◇</span><div><strong>Privacy first</strong><p>Identity always remains Unknown. Face detection does not prove identity, liveness, or authenticity.</p></div></div>
-    </section>
-    <section class="workspace-grid">
-      <article class="panel source-panel">
-        <div class="panel-heading"><div><span class="step">01</span><h2>Add your video</h2></div><span class="phase-tag">Phase 3</span></div>
-        <div id="errorBanner" class="error-banner" role="alert" hidden></div>
-        <div class="source-tabs" role="tablist"><button class="tab active" type="button" data-tab="upload">Upload video</button><button class="tab" type="button" data-tab="url">Public URL</button></div>
-        <div id="uploadPane" class="tab-pane active"><label class="dropzone" for="videoFile"><input id="videoFile" type="file" accept=".mp4,.mov,.mkv,.webm,.avi,.m4v,video/*"><span class="upload-icon">↑</span><strong>Drop a video here</strong><span>or click to browse · MP4, MOV, MKV, WEBM, AVI, M4V</span><small>Maximum size and duration are validated securely</small></label></div>
-        <div id="urlPane" class="tab-pane"><label class="field-label" for="videoUrl">Direct public video URL</label><div class="url-field"><span>↗</span><input id="videoUrl" type="url" placeholder="https://example.com/video.mp4"></div><p class="field-help">Private, login-required, and DRM-protected sources are not supported.</p></div>
-        <button id="processButton" class="process-button" type="button" disabled><span>✦</span> Detect human faces</button>
-      </article>
-      <article class="panel preview-panel">
-        <div class="panel-heading"><div><span class="step">02</span><h2>Video preview</h2></div><span class="duration">00:00</span></div>
-        <div id="videoEmpty" class="video-empty"><span class="play">▶</span><strong>Your video will appear here</strong><p>Add a supported source to begin.</p></div>
-        <video id="videoPreview" class="video-preview" controls hidden></video>
-        <div class="progress-wrap"><div class="progress-meta"><span id="progressStage">Waiting for a video</span><strong id="progressValue">0%</strong></div><div class="progress-track"><span id="progressBar"></span></div></div>
-      </article>
-    </section>
-    <section class="result-grid">
-      <article class="metric-card"><span class="metric-icon cyan">◎</span><div><small>HUMAN FACE</small><strong id="faceResult">Not processed</strong></div></article>
-      <article class="metric-card"><span class="metric-icon violet">◉</span><div><small>MAXIMUM FACES</small><strong id="maximumFaces">—</strong></div></article>
-      <article class="metric-card"><span class="metric-icon amber">◇</span><div><small>IDENTITY</small><strong>Unknown</strong></div></article>
-      <article class="metric-card"><span class="metric-icon green">◷</span><div><small>DURATION</small><strong id="resultDuration">—</strong></div></article>
-      <article class="metric-card"><span class="metric-icon cyan">#</span><div><small>SAMPLED FRAMES</small><strong id="sampledFrames">—</strong></div></article>
-      <article class="metric-card"><span class="metric-icon violet">%</span><div><small>AVERAGE DETECTION CONFIDENCE</small><strong id="averageConfidence">—</strong></div></article>
-      <article class="metric-card"><span class="metric-icon green">↑</span><div><small>BEST DETECTION CONFIDENCE</small><strong id="bestConfidence">—</strong></div></article>
-      <article class="metric-card"><span class="metric-icon amber">⚙</span><div><small>INFERENCE DEVICE</small><strong id="inferenceDevice">—</strong></div></article>
-    </section>
-    <p class="detection-disclaimer">Face detection only confirms that the detector found a face-like region. It does not prove identity, liveness, or authenticity.</p>
-    <section class="panel transcript-panel"><div class="panel-heading transcript-heading"><div><span class="step">03</span><h2>Timestamped transcript</h2></div><div class="transcript-actions"><input aria-label="Search transcript" type="search" placeholder="Search transcript…" disabled><button type="button" disabled>Copy</button><button type="button" disabled>TXT</button><button type="button" disabled>JSON</button><button type="button" disabled>SRT</button></div></div><div class="transcript-empty"><span>☷</span><strong>No transcript yet</strong><p>Transcription will be available in Phase 4.</p></div></section>
-  </main>
-  <footer>Process only content you own or are authorized to use.</footer>
-  <script src="{{ url_for('static', path='/js/app.js') }}" defer></script>
-</body>
-</html>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="VisionScribe AI detects face presence and transcribes authorized videos."><title>{{ app_name }}</title><link rel="stylesheet" href="{{ url_for('static', path='/css/app.css') }}"></head>
+<body><div class="ambient ambient-one"></div><div class="ambient ambient-two"></div><header class="topbar"><a class="brand" href="/"><span class="brand-mark">V</span><span><strong>VisionScribe</strong><small>AI video intelligence</small></span></a><div class="system-status"><span class="status-dot"></span><span id="apiStatus">Checking system</span></div></header>
+<main class="shell"><section class="hero"><div><span class="eyebrow">FACE PRESENCE + LOCAL SPEECH TRANSCRIPTION</span><h1>Turn video into a clear,<br><span>timestamped story.</span></h1><p>Detect face presence and transcribe Bengali, English, or mixed speech locally. Identity always remains Unknown.</p></div><div class="privacy-note"><span class="shield">◇</span><div><strong>Separate observations</strong><p>A detected voice is never claimed to belong to a detected face.</p></div></div></section>
+<section class="workspace-grid"><article class="panel source-panel"><div class="panel-heading"><div><span class="step">01</span><h2>Add your video</h2></div><span class="phase-tag">Phase 4</span></div><div id="errorBanner" class="error-banner" role="alert" hidden></div><div class="source-tabs"><button class="tab active" type="button" data-tab="upload">Upload video</button><button class="tab" type="button" data-tab="url">Public URL</button></div><div id="uploadPane" class="tab-pane active"><label class="dropzone" for="videoFile"><input id="videoFile" type="file" accept=".mp4,.mov,.mkv,.webm,.avi,.m4v,video/*"><span class="upload-icon">↑</span><strong>Drop a video here</strong><span>or click to browse · MP4, MOV, MKV, WEBM, AVI, M4V</span><small>Process only content you are authorized to use</small></label></div><div id="urlPane" class="tab-pane"><label class="field-label" for="videoUrl">Direct public video URL</label><div class="url-field"><span>↗</span><input id="videoUrl" type="url" placeholder="https://example.com/video.mp4"></div><p class="field-help">Private, login-required, and DRM-protected sources are not supported.</p></div><button id="processButton" class="process-button" type="button" disabled><span>✦</span> Process video</button></article>
+<article class="panel preview-panel"><div class="panel-heading"><div><span class="step">02</span><h2>Video preview</h2></div><span class="duration">00:00</span></div><div id="videoEmpty" class="video-empty"><span class="play">▶</span><strong>Your video will appear here</strong><p>Add a supported source to begin.</p></div><video id="videoPreview" class="video-preview" controls hidden></video><div class="progress-wrap"><div class="progress-meta"><span id="progressStage">Waiting for a video</span><strong id="progressValue">0%</strong></div><div class="progress-track"><span id="progressBar"></span></div></div></article></section>
+<section class="result-grid"><article class="metric-card"><span class="metric-icon cyan">◎</span><div><small>HUMAN FACE</small><strong id="faceResult">Not processed</strong></div></article><article class="metric-card"><span class="metric-icon violet">◉</span><div><small>MAXIMUM FACES</small><strong id="maximumFaces">—</strong></div></article><article class="metric-card"><span class="metric-icon amber">◇</span><div><small>IDENTITY</small><strong>Unknown</strong></div></article><article class="metric-card"><span class="metric-icon green">◷</span><div><small>DURATION</small><strong id="resultDuration">—</strong></div></article><article class="metric-card"><span class="metric-icon cyan">#</span><div><small>SAMPLED FRAMES</small><strong id="sampledFrames">—</strong></div></article><article class="metric-card"><span class="metric-icon violet">%</span><div><small>AVERAGE DETECTION CONFIDENCE</small><strong id="averageConfidence">—</strong></div></article><article class="metric-card"><span class="metric-icon green">文</span><div><small>DETECTED LANGUAGE</small><strong id="detectedLanguage">—</strong></div></article><article class="metric-card"><span class="metric-icon amber">⚙</span><div><small>TRANSCRIPTION DEVICE</small><strong id="transcriptionDevice">—</strong></div></article></section>
+<p class="detection-disclaimer">Face detection does not prove identity, liveness or authenticity. Transcription may contain errors, especially with noise, accents or mixed-language speech.</p><section class="panel transcript-panel"><div class="panel-heading transcript-heading"><div><span class="step">03</span><h2>Timestamped transcript</h2></div><div class="transcript-actions"><button type="button" disabled>Search · Phase 5</button><button type="button" disabled>Export · Phase 5</button></div></div><div id="transcriptionNotice" class="transcript-empty"><span>☷</span><strong>No transcript yet</strong><p>Process a video to detect speech.</p></div><div id="transcriptChat" class="transcript-chat" hidden></div></section></main><footer>Face and voice are separate observations. Process only authorized content.</footer><script src="{{ url_for('static', path='/js/app.js') }}" defer></script></body></html>

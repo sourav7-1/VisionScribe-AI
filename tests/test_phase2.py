@@ -163,9 +163,9 @@ def test_background_completion_and_cleanup(
         assert result.status == "completed"
         assert result.progress == 100
         assert result.video_duration == 3.5
-        assert "Phase 4" in result.current_stage
+        assert "transcription" in result.current_stage.lower()
     assert not path.exists()
 
 
 def test_openapi_version(client: TestClient) -> None:
-    assert client.get("/openapi.json").json()["info"]["version"] == "0.3.0"
+    assert client.get("/openapi.json").json()["info"]["version"] == "0.4.0"

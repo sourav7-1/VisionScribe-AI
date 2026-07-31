@@ -37,8 +37,18 @@ def migrate_sqlite_schema(database_engine: object) -> None:
             column["name"]
             for column in inspect(database_engine).get_columns("processing_jobs")
         }
-        if "inference_device" not in columns:
-            with database_engine.begin() as connection:
-                connection.execute(
-                    text("ALTER TABLE processing_jobs ADD COLUMN inference_device VARCHAR(16)")
-                )
+        additions = {
+            "inference_device": "VARCHAR(16)",
+            "transcription_status": "VARCHAR(24) DEFAULT 'pending'",
+            "transcription_device": "VARCHAR(16)",
+            "language_probability": "FLOAT",
+            "audio_duration": "FLOAT",
+            "transcription_segment_count": "INTEGER",
+            "transcription_warning": "TEXT",
+        }
+        with database_engine.begin() as connection:
+            for name, sql_type in additions.items():
+                if name not in columns:
+                    connection.execute(
+                        text(f"ALTER TABLE processing_jobs ADD COLUMN {name} {sql_type}")
+                    )

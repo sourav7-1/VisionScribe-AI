@@ -25,6 +25,14 @@ def discover_ffprobe() -> str:
     return "ffprobe"
 
 
+def discover_ffmpeg() -> str:
+    probe = Path(discover_ffprobe())
+    sibling = probe.with_name("ffmpeg.exe")
+    if sibling.exists():
+        return str(sibling)
+    return shutil.which("ffmpeg") or "ffmpeg"
+
+
 class Settings(BaseSettings):
     app_name: str = "VisionScribe AI"
     app_env: str = "development"
@@ -43,6 +51,7 @@ class Settings(BaseSettings):
     max_url_redirects: int = 3
     upload_chunk_size_bytes: int = 1048576
     ffprobe_binary: str = Field(default_factory=discover_ffprobe)
+    ffmpeg_binary: str = Field(default_factory=discover_ffmpeg)
     log_level: str = "INFO"
     temp_dir: Path = PROJECT_ROOT / "temp"
     frame_sample_interval_seconds: float = 1.0
@@ -56,6 +65,18 @@ class Settings(BaseSettings):
     whisper_model: str = "medium"
     whisper_device: str = "auto"
     whisper_compute_type: str = "auto"
+    whisper_cpu_compute_type: str = "int8"
+    whisper_cuda_compute_type: str = "float16"
+    whisper_beam_size: int = 5
+    whisper_vad_filter: bool = True
+    whisper_condition_on_previous_text: bool = True
+    whisper_model_root: Path = PROJECT_ROOT / "models" / "whisper"
+    whisper_download_root: Path = PROJECT_ROOT / "models" / "whisper"
+    whisper_language: str | None = None
+    audio_sample_rate: int = 16000
+    audio_channels: int = 1
+    audio_format: str = "wav"
+    audio_extraction_timeout_seconds: int = 300
 
     model_config = SettingsConfigDict(
         env_file=PROJECT_ROOT / ".env",
@@ -86,7 +107,9 @@ class Settings(BaseSettings):
             return False
         return value
 
-    @field_validator("temp_dir", "face_model_root", mode="after")
+    @field_validator(
+        "temp_dir", "face_model_root", "whisper_model_root", "whisper_download_root", mode="after"
+    )
     @classmethod
     def make_temp_dir_absolute(cls, value: Path) -> Path:
         return value if value.is_absolute() else PROJECT_ROOT / value
@@ -98,6 +121,19 @@ class Settings(BaseSettings):
         if normalized not in {"auto", "cuda", "cpu"}:
             raise ValueError("FACE_DEVICE must be auto, cuda, or cpu")
         return normalized
+
+    @field_validator("whisper_device")
+    @classmethod
+    def validate_whisper_device(cls, value: str) -> str:
+        normalized = value.lower()
+        if normalized not in {"auto", "cuda", "cpu"}:
+            raise ValueError("WHISPER_DEVICE must be auto, cuda, or cpu")
+        return normalized
+
+    @field_validator("whisper_language", mode="before")
+    @classmethod
+    def empty_language_is_auto(cls, value: object) -> object:
+        return None if value == "" else value
 
 
 @lru_cache

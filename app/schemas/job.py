@@ -33,6 +33,12 @@ class JobResponse(BaseModel):
     inference_device: str | None
     detected_language: str | None
     transcript_json: list[dict] | None
+    transcription_status: str | None
+    transcription_device: str | None
+    language_probability: float | None
+    audio_duration: float | None
+    transcription_segment_count: int | None
+    transcription_warning: str | None
     error_message: str | None
     created_at: datetime
     completed_at: datetime | None

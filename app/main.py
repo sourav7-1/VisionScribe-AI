@@ -27,7 +27,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.3.0",
+    version="0.4.0",
     description="Face-presence detection and timestamped video transcription.",
     debug=settings.debug,
     lifespan=lifespan,
